@@ -21,8 +21,6 @@
         .form-buttons-container { display: flex; align-items: center; flex-wrap: wrap; }
 
         /* --- 🎨 NEW: Tablet UI Adjustments (Fullscreen Form) --- */
-        
-        /* เมื่อเป็นแท็บเล็ตและหน้าฟอร์มถูกแสดง (JS จะตั้งเป็น 'flex') */
         .is-tablet #form-view-container {
             position: fixed;
             top: 0;
@@ -32,23 +30,49 @@
             background-color: white; 
             z-index: 100;
             padding: 15px;
-            
-            /* ใช้ Flexbox เพื่อจัดเรียงองค์ประกอบภายใน (title, buttons, iframe) */
             display: none; /* Default คือซ่อน */
             flex-direction: column;
         }
-
         .is-tablet #form-view-container .iframe-container {
-            /* ให้ iframe container ยืดเต็มพื้นที่ที่เหลือ */
-            flex-grow: 1; /* << สำคัญมาก */
-            height: 100%; /* สำหรับ Flex item */
+            flex-grow: 1;
+            height: 100%;
         }
-        
         .is-tablet #form-view-container #google-form-iframe {
-            /* มั่นใจว่า iframe ยืดเต็ม 100% ของ container */
             height: 100%;
         }
         /* --- End Tablet UI Adjustments --- */
+
+        /* --- 🔒 NEW: Lock Screen Styles --- */
+        #lock-screen-overlay {
+            display: none; /* ซ่อนไว้เป็นค่าเริ่มต้น */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.75); /* พื้นหลังสีเข้ม */
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column; /* เพิ่ม: เพื่อให้ modal อยู่ตรงกลาง */
+        }
+
+        #lock-screen-modal {
+            background-color: white;
+            padding: 25px;
+            border-radius: 8px;
+            text-align: center;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        #lock-screen-error {
+            color: red; 
+            display: none; 
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+        /* --- End Lock Screen Styles --- */
 
     </style>
 </head>
@@ -85,6 +109,15 @@
         </div>
     </div>
 
+    <div id="lock-screen-overlay">
+        <div id="lock-screen-modal">
+            <h3 class="mb-3">🔒 หน้าจอถูกล็อค</h3>
+            <p>คุณสลับหน้าจอออกไป กรุณาใส่รหัสผ่านเพื่อปลดล็อค:</p>
+            <input type="password" id="lock-screen-password" class="form-control" placeholder="รหัสผ่าน">
+            <button id="lock-screen-submit" class="btn btn-primary mt-3 w-100">ปลดล็อค</button>
+            <p id="lock-screen-error">รหัสผ่านไม่ถูกต้อง</p>
+        </div>
+    </div>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script>
          // =================================================================
@@ -117,6 +150,11 @@
         let isFormSubmitted = false;
         let completedFormIds = [];
 
+        // +++ NEW: Lock Screen Password +++
+        const UNLOCK_CODE = "ome";
+        // +++ END NEW +++
+
+
         // --- DOM Elements ---
         const userInfoDiv = document.getElementById('user-info-card');
         const linksViewDiv = document.getElementById('links-view');
@@ -130,7 +168,25 @@
         const formCompletedSuccessBtnEl = document.getElementById('form-completed-success-btn');
         const iframeOverlay = document.getElementById('iframe-overlay');
 
+        // +++ NEW: Lock Screen DOM Elements +++
+        const lockScreenOverlay = document.getElementById('lock-screen-overlay');
+        const lockScreenPasswordInput = document.getElementById('lock-screen-password');
+        const lockScreenSubmitBtn = document.getElementById('lock-screen-submit');
+        const lockScreenError = document.getElementById('lock-screen-error');
+        // +++ END NEW +++
+
         document.addEventListener('DOMContentLoaded', initializeLiffApp);
+
+        // +++ NEW: Lock Screen Event Listeners +++
+        lockScreenSubmitBtn.addEventListener('click', handleUnlockAttempt);
+        lockScreenPasswordInput.addEventListener('keyup', (event) => {
+            lockScreenError.style.display = 'none'; // ซ่อน error เมื่อเริ่มพิมพ์
+            if (event.key === 'Enter') {
+                handleUnlockAttempt();
+            }
+        });
+        // +++ END NEW +++
+
 
         async function initializeLiffApp() {
             showError("");
@@ -293,16 +349,18 @@
         function navigateToLinksPage() {
             // +++ 📝 MODIFIED +++
             if (document.body.classList.contains('is-tablet')) {
-                // บนแท็บเล็ต, เราต้องแสดง user-info-card และ links-view
                 userInfoDiv.style.display = 'block';
                 linksViewDiv.style.display = 'block';
                 formViewContainerDiv.style.display = 'none';
             } else {
-                // ทำงานเหมือนเดิมสำหรับมือถือ
                 linksViewDiv.style.display = 'block';
                 formViewContainerDiv.style.display = 'none';
             }
             // +++ END MODIFIED +++
+
+            // +++ NEW: Ensure lock screen is hidden +++
+            hideLockScreen();
+            // +++ END NEW +++
 
             if (googleFormIframeEl.src !== 'about:blank') {
                 googleFormIframeEl.src = 'about:blank';
@@ -317,12 +375,10 @@
         function navigateToFormPage(form) {
             // +++ 📝 MODIFIED +++
             if (document.body.classList.contains('is-tablet')) {
-                // บนแท็บเล็ต, ซ่อนทุกอย่างและแสดงฟอร์มแบบ flex (เต็มจอ)
                 userInfoDiv.style.display = 'none';
                 linksViewDiv.style.display = 'none';
                 formViewContainerDiv.style.display = 'flex'; // 👈 **สำคัญ: เปลี่ยนเป็น 'flex'**
             } else {
-                // ทำงานเหมือนเดิมสำหรับมือถือ
                 linksViewDiv.style.display = 'none';
                 formViewContainerDiv.style.display = 'block'; // 👈 **เหมือนเดิม**
             }
@@ -386,8 +442,16 @@
 
         function handleVisibilityChange() {
             if (!currentActiveForm || !isVisibilityListenerActive) return;
+            
             if (document.hidden) {
+                // +++ 📝 MODIFIED: Trigger Lock Screen +++
                 logEventToSheet(`ผู้ใช้สลับหน้าจอ/ซ่อนเบราว์เซอร์ขณะทำ: ${currentActiveForm.title}`);
+                
+                // ล็อคหน้าจอเฉพาะเมื่อแบบฟอร์มยังไม่ถูกส่ง
+                if (!isFormSubmitted) {
+                    showLockScreen();
+                }
+                // +++ END MODIFIED +++
             }
         }
 
@@ -404,6 +468,37 @@
                 isVisibilityListenerActive = false;
             }
         }
+
+        // +++ NEW: Lock Screen Functions +++
+        function showLockScreen() {
+            // ป้องกันการล็อคซ้ำซ้อน
+            if (lockScreenOverlay.style.display === 'flex') return;
+            
+            console.log("Showing lock screen due to visibility change.");
+            lockScreenPasswordInput.value = ""; // เคลียร์รหัสผ่านเก่า
+            lockScreenError.style.display = 'none'; // ซ่อนข้อความ error
+            lockScreenOverlay.style.display = 'flex'; // แสดง Pop-up
+            lockScreenPasswordInput.focus(); // Focus ที่ช่องใส่รหัส
+        }
+
+        function hideLockScreen() {
+            console.log("Hiding lock screen.");
+            lockScreenOverlay.style.display = 'none';
+            lockScreenPasswordInput.value = "";
+            lockScreenError.style.display = 'none';
+        }
+
+        function handleUnlockAttempt() {
+            const inputPassword = lockScreenPasswordInput.value;
+            if (inputPassword === UNLOCK_CODE) {
+                hideLockScreen();
+            } else {
+                lockScreenError.style.display = 'block'; // แสดง error
+                lockScreenPasswordInput.value = ""; // เคลียร์ช่อง
+                lockScreenPasswordInput.focus(); // ให้ focus ใหม่
+            }
+        }
+        // +++ END NEW +++
         
         async function logEventToSheet(message) {
             if (!mainAppUrl) return;
