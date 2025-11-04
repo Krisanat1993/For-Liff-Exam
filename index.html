@@ -154,9 +154,6 @@
         const UNLOCK_CODE = "ome";
         // +++ END NEW +++
 
-        // +++ NEW: Back Button Navigation Flag +++
-        let isNavigatingBackSafely = false;
-        // +++ END NEW +++
 
         // --- DOM Elements ---
         const userInfoDiv = document.getElementById('user-info-card');
@@ -201,11 +198,6 @@
                 document.body.classList.add('is-tablet');
                 console.log("Tablet device detected. Applying full-screen form UI.");
             }
-            // +++ END NEW +++
-
-            // +++ NEW: Add History/Back Button management +++
-            // เพิ่ม listener เพื่อดักจับการกดปุ่ม Back
-            window.addEventListener('popstate', handleBackButton);
             // +++ END NEW +++
 
             try {
@@ -415,11 +407,6 @@
             }
             isIframeInitialLoad = true;
             googleFormIframeEl.src = targetFormUrl;
-
-            // +++ NEW: Push a new history state to intercept the back button +++
-            // เพิ่ม state "ปลอม" เข้าไปใน history เมื่อเริ่มทำแบบสอบถาม
-            history.pushState({ page: "formView", ts: Date.now() }, form.title, "#form");
-            // +++ END NEW +++
         }
 
         googleFormIframeEl.onload = function() {
@@ -439,12 +426,7 @@
 
         backToLinksBtnEl.addEventListener('click', () => {
             logEventToSheet(`ผู้ใช้ออกจากแบบสอบถามด้วยตนเอง: ${currentActiveForm.title}`);
-            
-            // +++ NEW: Set flag and use history.back() to navigate +++
-            isNavigatingBackSafely = true;
-            history.back(); // สั่งให้เบราว์เซอร์ย้อนกลับ ซึ่งจะไป trigger 'popstate'
-            // navigateToLinksPage(); // 👈 ไม่เรียกตรงนี้แล้ว
-            // +++ END NEW +++
+            navigateToLinksPage();
         });
 
         formCompletedSuccessBtnEl.addEventListener('click', () => {
@@ -454,36 +436,9 @@
                     localStorage.setItem('completedFormIds', JSON.stringify(completedFormIds));
                 }
                 logEventToSheet(`ผู้ใช้ยืนยันทำแบบทดสอบสำเร็จ: ${currentActiveForm.title}`);
-                
-                // +++ NEW: Set flag and use history.back() to navigate +++
-                isNavigatingBackSafely = true;
-                history.back(); // สั่งให้เบราว์เซอร์ย้อนกลับ ซึ่งจะไป trigger 'popstate'
-                // navigateToLinksPage(); // 👈 ไม่เรียกตรงนี้แล้ว
-                // +++ END NEW +++
+                navigateToLinksPage();
             }
         });
-
-        // +++ NEW: Function to handle browser back button +++
-        function handleBackButton(event) {
-            // ตรวจสอบว่าเรากำลังอยู่ในหน้าแบบสอบถามหรือไม่
-            if (currentActiveForm) {
-                if (isNavigatingBackSafely) {
-                    // นี่คือการย้อนกลับที่ "อนุญาต" (มาจากปุ่มของเรา)
-                    // ทำการย้อนหน้าจอและโหลดรายการใหม่
-                    navigateToLinksPage(); 
-                    
-                    // รีเซ็ตธง
-                    isNavigatingBackSafely = false;
-                } else {
-                    // นี่คือการย้อนกลับที่ "ไม่อนุญาต" (เช่น กดปุ่ม Back ของเบราว์เซอร์)
-                    // เราจะ "ยกเลิก" การย้อนกลับโดยการ push state เดิมกลับเข้าไปใหม่
-                    history.pushState({ page: "formView", ts: Date.now() }, currentActiveForm.title, "#form");
-                    
-                    // (Optional: สามารถแสดง alert ที่นี่ได้ว่า "กรุณาใช้ปุ่มในแอป")
-                }
-            }
-        }
-        // +++ END NEW +++
 
         function handleVisibilityChange() {
             if (!currentActiveForm || !isVisibilityListenerActive) return;
