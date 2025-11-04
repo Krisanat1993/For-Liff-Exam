@@ -19,6 +19,37 @@
         #error-message-display { color: red; background-color: #fdd; border: 1px solid #fbb; padding: 10px; margin-bottom: 15px; border-radius: 5px; display: none; }
         #forms-loading-spinner { display: none; }
         .form-buttons-container { display: flex; align-items: center; flex-wrap: wrap; }
+
+        /* --- 🎨 NEW: Tablet UI Adjustments (Fullscreen Form) --- */
+        
+        /* เมื่อเป็นแท็บเล็ตและหน้าฟอร์มถูกแสดง (JS จะตั้งเป็น 'flex') */
+        .is-tablet #form-view-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background-color: white; 
+            z-index: 100;
+            padding: 15px;
+            
+            /* ใช้ Flexbox เพื่อจัดเรียงองค์ประกอบภายใน (title, buttons, iframe) */
+            display: none; /* Default คือซ่อน */
+            flex-direction: column;
+        }
+
+        .is-tablet #form-view-container .iframe-container {
+            /* ให้ iframe container ยืดเต็มพื้นที่ที่เหลือ */
+            flex-grow: 1; /* << สำคัญมาก */
+            height: 100%; /* สำหรับ Flex item */
+        }
+        
+        .is-tablet #form-view-container #google-form-iframe {
+            /* มั่นใจว่า iframe ยืดเต็ม 100% ของ container */
+            height: 100%;
+        }
+        /* --- End Tablet UI Adjustments --- */
+
     </style>
 </head>
 <body>
@@ -104,6 +135,15 @@
         async function initializeLiffApp() {
             showError("");
             console.log("DOMContentLoaded, starting initializeLiffApp...");
+
+            // +++ NEW: ตรวจสอบ Tablet +++
+            const isTablet = /Tablet|iPad/i.test(navigator.userAgent);
+            if (isTablet) {
+                document.body.classList.add('is-tablet');
+                console.log("Tablet device detected. Applying full-screen form UI.");
+            }
+            // +++ END NEW +++
+
             try {
                 const storedCompletedForms = localStorage.getItem('completedFormIds');
                 if (storedCompletedForms) {
@@ -251,8 +291,19 @@
         }
 
         function navigateToLinksPage() {
-            linksViewDiv.style.display = 'block';
-            formViewContainerDiv.style.display = 'none';
+            // +++ 📝 MODIFIED +++
+            if (document.body.classList.contains('is-tablet')) {
+                // บนแท็บเล็ต, เราต้องแสดง user-info-card และ links-view
+                userInfoDiv.style.display = 'block';
+                linksViewDiv.style.display = 'block';
+                formViewContainerDiv.style.display = 'none';
+            } else {
+                // ทำงานเหมือนเดิมสำหรับมือถือ
+                linksViewDiv.style.display = 'block';
+                formViewContainerDiv.style.display = 'none';
+            }
+            // +++ END MODIFIED +++
+
             if (googleFormIframeEl.src !== 'about:blank') {
                 googleFormIframeEl.src = 'about:blank';
             }
@@ -264,8 +315,19 @@
         }
 
         function navigateToFormPage(form) {
-            linksViewDiv.style.display = 'none';
-            formViewContainerDiv.style.display = 'block';
+            // +++ 📝 MODIFIED +++
+            if (document.body.classList.contains('is-tablet')) {
+                // บนแท็บเล็ต, ซ่อนทุกอย่างและแสดงฟอร์มแบบ flex (เต็มจอ)
+                userInfoDiv.style.display = 'none';
+                linksViewDiv.style.display = 'none';
+                formViewContainerDiv.style.display = 'flex'; // 👈 **สำคัญ: เปลี่ยนเป็น 'flex'**
+            } else {
+                // ทำงานเหมือนเดิมสำหรับมือถือ
+                linksViewDiv.style.display = 'none';
+                formViewContainerDiv.style.display = 'block'; // 👈 **เหมือนเดิม**
+            }
+            // +++ END MODIFIED +++
+
             currentFormTitleEl.textContent = form.title;
             document.title = form.title;
         }
